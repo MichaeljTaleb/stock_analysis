@@ -7,13 +7,19 @@
 
 import requests
 
+# functions to check in a caseinsensitive manner whether or not the title
+# mentions the stock
+def contains_case_insensitive(title, stock):
+    return stock.lower() in title.lower()
 
-# this is a test funciton to get the id of the lastest articles
-# this should later be updated to get either articles between a time range or on a certain stock
-def get_article_id():
+# Gets the ids of all the articles in a specified time range
+# Parameter is the name of the stock to look for
+def get_article_id(stock):
     url = "https://seeking-alpha.p.rapidapi.com/articles/v2/list"
 
-    querystring = {"size": "20", "number": "1", "category": "latest-articles"}
+    # since and until is the date range that the articles are fetched from
+    querystring = {"until": "1707986312", "since": "1676450312", "size": "100", "number": "1",
+                   "category": "latest-articles"}
 
     headers = {
         "X-RapidAPI-Key": "8a28ed0502msh5d73d744c8833f2p1bd458jsn6b9c2f7556ab",
@@ -21,8 +27,12 @@ def get_article_id():
     }
 
     response = requests.get(url, headers=headers, params=querystring).json()
-    article_id = response['data'][0]['id']
-    return article_id
+    article_ids = []
+    for article in response["data"]:
+        if contains_case_insensitive(article["attributes"]["title"], stock):
+            article_ids.append(article["id"])
+
+    return article_ids
 
 
 # function that gets API call that gets data
@@ -37,24 +47,48 @@ def get_article(id):
         "X-RapidAPI-Host": "seeking-alpha.p.rapidapi.com"
     }
 
-    response = requests.get(url, headers=headers, params=querystring).json()
+    response = requests.get(url, headers=headers, params=querystring)
 
-    # 	data to print/return
-    attributes = response['data']['attributes']
-    date = attributes['publishOn']
-    title = attributes['title']
-    summary = attributes['summary']
-    article = attributes['content']
-    author_id = response['data']['relationships']['author']['data']['id']
+
+    # Check if the response is JSON
+    # ChatGPT wrote this code to exception check since not all of the API calls were in JSON format
+    if response.headers.get('Content-Type') == 'application/json':
+        try:
+            data = response.json()
+        except requests.exceptions.JSONDecodeError as e:
+            print("JSONDecodeError:", e)
+            print("Response content:", response.text)
+            return None
+
+        # Extract data to print/return
+        try:
+            attributes = data['data']['attributes']
+            date = attributes['publishOn']
+            title = attributes['title']
+            summary = attributes['summary']
+            article = attributes['content']
+            author_id = data['data']['relationships']['author']['data']['id']
+            return date, title, summary, article, author_id
+        except KeyError as e:
+            print("KeyError:", e)
+            print("Response content:", response.text)
+            return None
+    else:
+        print("Unexpected response format:", response.text)
+        return None
+
+    # if no errors were encountered just return the fields we need
     return date, title, summary, article, author_id
 
 
-article_id = get_article_id()
-date, title, summary, article, author_id = get_article(article_id)
+article_ids = get_article_id("gold")
 
-print("date: " + date + "\n")
-print("title: " + title + "\n")
-print("summary: " + ' '.join(summary) + "\n")
-print("text: " + article + "\n")
-print("author_id: " + author_id + "\n")
-# print()
+for article_id in article_ids:
+    date, title, summary, article, author_id = get_article(article_id)
+
+    print("date: " + date + "\n")
+    print("title: " + title + "\n")
+    print("summary: " + ' '.join(summary) + "\n")
+    # print("text: " + article + "\n")
+    print("author_id: " + author_id + "\n")
+    # print()
