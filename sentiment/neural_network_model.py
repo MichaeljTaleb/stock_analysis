@@ -8,7 +8,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
 
 # Load dataset
-data = pd.read_csv('sentiment_dataset.csv')  # Replace with your dataset path
+data = pd.read_csv('sentiment_dataset.csv') 
 texts = data['text'].values
 labels = data['label'].values
 
